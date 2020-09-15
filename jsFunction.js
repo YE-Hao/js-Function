@@ -271,6 +271,19 @@ function myNew (fn) {
   }
   return obj;
 }
+// 实现instanceof
+function myInstanceof(x,y) {
+  if(typeof x !== 'object' || typeof y !== 'function') {
+    throw new TypeError('x,y illeagle');
+  }
+  while(x.__proto__) {
+    if(x.__proto__ === y.prototype) {
+      return true;
+    }
+    x = x.__proto__;
+  }
+  return false;
+}
 // 实现call
 Function.prototype.Call = function(context) {
   var obj = context || window;
@@ -328,80 +341,248 @@ const observers = obj => new Proxy(obj,{
   }
 });
 // 实现promise
-function IPromise (excutor) {
-  var _this = this;
-  _this.status = 'pendding';
-  _this.value = null;
-  _this.resolveList = [];
-  _this.rejectedList = [];
-  try {
-    excutor(resolve, rejected);
-  } catch (e) {
-    rejected(e)
-  }
+function DoPromise(excutor) {
+  const _this = this;
+  this.status = 'PENDDING';
+  this.value = null;
+  this.reason = null;
+  this.rejectedList = [];
+  this.resolveList = [];
   function resolve(value) {
-    console.log('resolve',value)
-    if (_this.status === 'pendding') {
-      _this.status = 'fulfilled';
+    if(_this.status === 'PENDDING') {
+      _this.status = 'FULFILLED';
       _this.value = value;
-      _this.resolveList.forEach((item) => {
-        item(_this.value);
-        _this.resolveList.shift();
-      });
+      _this.resolveList.forEach(fn => fn());
+    }
+  };
+  function rejected(reason) {
+    if(_this.status === 'PENDDING') {
+      _this.status = 'REJECTED';
+      _this.reason = reason;
+      _this.rejectedList.forEach(fn => fn())
     }
   }
-  function rejected(value) {
-    if (_this.status === 'pendding') {
-      _this.status = 'rejected';
-      _this.value = value;
-      _this.rejectedList.forEach((item) => {
-        item(_this.value);
-        _this.rejectedList.shift();
+  try {
+    excutor(resolve, rejected);
+  } catch(e) {
+    rejected(e)
+  }
+}
+function resolvePromise(promise, x, resolve, rejected) {
+  if(promise === x) {
+    rejected(new TypeError('Chaining cycle'));
+  }
+  let used;
+  if((x !== null && typeof x === 'object') || (typeof x === 'function')) {
+    try {
+      let then = x.then;
+      if (typeof then === 'function') {
+        then.call(x, (y) => {
+          if (used) return;
+          used = true;
+          resolvePromise(promise, y, resolve, rejected);
+        }, (err) => {
+          if (used) return;
+          used = true;
+          rejected(err);
+        });
+      } else {
+        if (used) return;
+        used = true;
+        resolve(x);
+      }
+    } catch(e) {
+      rejected(e)
+    }
+  } else {
+    resolve(x);
+  }
+}
+DoPromise.prototype.then = function(resolveCB, rejectedCB) {
+  var _this = this;
+  resolveCB = typeof resolveCB === 'function' ? resolveCB : v => v;
+  rejectedCB = typeof rejectedCB === 'function' ? rejectedCB : reason => { throw reason };
+  var promise2 = new DoPromise((resolve, rejected) => {
+    if(_this.status === 'FULFILLED') {
+      setTimeout(() => {
+        try {
+          let x = resolveCB(_this.value);
+          resolvePromise(promise2, x, resolve, rejected);
+        } catch(e) {
+          rejected(e);
+        }
+      },0);
+    }
+    if(_this.status === 'REJECTED') {
+      setTimeout(() => {
+        try {
+          let x = rejectedCB(_this.reason);
+          resolvePromise(promise2, x, resolve, rejected);
+        } catch(e) {
+          rejected(e)
+        }
+      },0);
+    }
+    if(_this.status === 'PENDDING') {
+      _this.resolveList.push(() => {
+        setTimeout(() => {
+          try {
+            let x = resolveCB(_this.value);
+            resolvePromise(promise2, x, resolve, rejected);
+          } catch(e) {
+            rejected(e);
+          }
+        },0);
       });
+      _this.rejectedList.push(() => {
+        setTimeout(() => {
+          try {
+            let x = rejectedCB(_this.reason);
+            resolvePromise(promise2, x, resolve, rejected);
+          } catch(e) {
+            rejected(e);
+          }
+        },0);
+      });
+    }
+  });
+  return promise2;
+  // if(this.status === 'FULFILLED') {
+  //   typeof resolveCB === 'function' && resolveCB(this.value);
+  // }
+  // if(this.status === 'REJECTED') {
+  //   typeof rejectedCB === 'function' && rejectedCB(this.reason)
+  // }
+  // if(this.status === 'PENDDING') {
+  //   typeof resolveCB === 'function' && this.resolveList.push(resolveCB);
+  //   typeof rejectedCB === 'function' && this.rejectedList.push(rejectedCB);
+  // }
+}
+DoPromise.resolve = function(value) {
+  const p = new DoPromise((resolve, rejected) => {
+    resolvePromise(p, value, resolve, rejected);
+  });
+  return p;
+}
+DoPromise.reject = function(value) {
+  return new DoPromise((resolve, rejected) => {
+    rejected(value);
+  });
+}
+DoPromise.prototype.catch = function(cb) {
+  return this.then(null,cb);
+}
+DoPromise.prototype.finally = function(cb) {
+  return this.then(value =>{
+    return DoPromise.resolve(cb()).then(() => value);
+  }, reason => {
+    return DoPromise.resolve(cb()).then(() => { throw reason });
+  })
+}
+DoPromise.all = function(arrs) {
+  if(arrs instanceof Array) {
+    return new DoPromise((resolve, rejected) => {
+      let resultList = [];
+      let index = 0;
+      const resultByKey = (value, i) => {
+        resultList[i] = value;
+        if(++index === arrs.length) {
+          resolve(resultList);
+        }
+      }
+      for(let j = 0; j < arrs.length; j ++) {
+        let each = arrs[j];
+        if (each && typeof each.then === 'function') {
+          each.then(r => {
+            resultByKey(r, j);
+          }, rejected);
+        } else {
+          resultByKey(each, j);
+        }
+      }
+    });
+  } else {
+    throw new TypeError(`${arr} is not Iterable!`);
+  }
+}
+DoPromise.race = function (arr) {
+  return new DoPromise((resolve, rejected) => {
+    if(arr.length === 0) {
+      return;
+    }
+    for(let i = 0; i < arr.length; i ++) {
+      DoPromise.resolve(arr[i]).then(res => resolve(res), err => rejected(err))
+    }
+  });
+}
+// 递归深copy
+function deepCopy(target) {
+  // var copyObj = {};
+  const _deepCopy = (target) => {
+    var copyObj = Array.isArray(target) ? [] : {};
+    for(let key in target) {
+      copyObj[key] = typeof target[key] === 'object' ? _deepCopy(target[key]) : target[key];
+      console.log(copyObj[key])
+    }
+    return copyObj;
+  }
+  return _deepCopy(target);
+}
+// 函数柯里化
+function checkout(str, reg) {
+  return reg.test(str);
+}
+function currying(fn) {
+  return function(reg){
+    return function(str){
+      return fn.call(this, str, reg);
     }
   }
 }
-IPromise.prototype.then = function(res, rej) {
-  var _this = this;
-  if (_this.status === 'fulfilled') {
-    return new IPromise((resolve, rejected) => {
-      const result = res(_this.value); // 执行then的回调函数
-      if (result instanceof IPromise) {
-        result.then(resolve, rejected)
-      } else {
-        resolve(result);
-      }
-    });
+// 柯里化通用
+function createCurrying(fn) {
+  const fnArgs = fn.length;
+  const args = Array.prototype.slice.call(arguments,1);
+  return function () {
+    var _args = [].slice.call(arguments); // 接受后续的参数
+    var finalArgs = [...args,..._args];
+    if (fnArgs > finalArgs.length) {
+      return createCurrying.call(this, fn, ...finalArgs);
+    }
+    return fn.apply(this, finalArgs);
   }
-  if (_this.status === 'rejected') {
-    return new IPromise((resolve, rejected) => {
-      const result = rejected(_this.value);
-      if (result instanceof IPromise) {
-        result.then(resolve, rejected);
-      } else {
-        rejected(this.value);
-      }
-    });
+}
+// 无限参数
+function add() {
+  var args = [].slice.call(arguments);
+  var adder = function() {
+    var _adder = function() {
+      args.push(...arguments);
+      return _adder;
+    }
+
+    // 重写tostring函数
+    _adder.toString = function() {
+      return args.reduce((a, b) => a + b);
+    }
+    return _adder;
   }
-  if (_this.status === 'pendding') {
-    return new IPromise((resolve, rejected) => {
-      _this.resolveList.push(() => {
-        var result = res(_this.value);
-        if (result instanceof IPromise) {
-          result.then(resolve, rejected);
-        } else {
-          resolve(_this.value);
-        }
-      });
-      _this.rejectedList.push(() => {
-        var result = rej(_this.value);
-        if (result instanceof IPromise) {
-          result.then(resolve, rejected);
-        } else {
-          rejected(_this.value)
-        }
-      })
-    });
+  return adder(...args);
+}
+// 自己实现
+function myAdd() {
+  var args = [].slice.call(arguments);
+  var add = function() {
+    var _add = function(){
+      args.push(...arguments);
+      console.log(999);
+      return _add;
+    }
+    _add.toString = function(){
+      return args.reduce((a, b) => a + b);
+    }
+    return _add;
   }
+  return add(...args);
 }
 

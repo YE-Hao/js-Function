@@ -28,7 +28,7 @@ Element.prototype.render = function() {
     var child;
     if (item instanceof Element) {
       child = item.render();
-    } else{
+    } else {
       child = document.createTextNode(item);
     }
     ele.appendChild(child);
