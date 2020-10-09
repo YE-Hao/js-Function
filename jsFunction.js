@@ -259,6 +259,19 @@ Array.prototype.Splice = function() {
     return arr;
   }
 }
+let a = new Set([1, 2, 3]);
+let b = new Set([4, 3, 2]);
+
+// 并集
+let union = new Set([...a, ...b]);
+// Set {1, 2, 3, 4}
+
+// 交集
+let intersect = new Set([...a].filter(x => b.has(x)));
+// set {2, 3}
+
+// （a 相对于 b 的）差集
+let difference = new Set([...a].filter(x => !b.has(x)));
 /***==========实现js通用一些方法********/
 function myNew (fn) {
   var obj = {};
@@ -518,11 +531,25 @@ DoPromise.race = function (arr) {
 // 递归深copy
 function deepCopy(target) {
   // var copyObj = {};
-  const _deepCopy = (target) => {
+  const _deepCopy = (target, hash = new WeakMap()) => {
+    if (hash.has(target)) { // 解决循环引用的问题
+      return hash.get(target);
+    }
     var copyObj = Array.isArray(target) ? [] : {};
+    hash.set(target, copyObj);
     for(let key in target) {
-      copyObj[key] = typeof target[key] === 'object' ? _deepCopy(target[key]) : target[key];
-      console.log(copyObj[key])
+      const type = Object.prototype.toString.call(target[key]);
+      switch(type){
+        case '[object RegExp]':
+        case '[object Date]':
+        case '[object Function]':
+        case '[object Null]':
+          copyObj[key] = target[key];
+          break;
+        default:
+          copyObj[key] = typeof target[key] === 'object' ? _deepCopy(target[key], hash) : target[key];
+          break;
+      }
     }
     return copyObj;
   }
@@ -551,6 +578,21 @@ function createCurrying(fn) {
     }
     return fn.apply(this, finalArgs);
   }
+}
+function currying(fn) {
+  const fnArgs = fn.length;
+  var args = [].slice.call(arguments,1);
+  console.log(arguments);
+  console.log(args);
+  var _currying = function() {
+    var _args = [].slice.call(arguments);
+    var finalArgs = [...args, ..._args];
+    if (fnArgs > finalArgs.length) {
+      return currying.call(this, fn, ...finalArgs);
+    }
+    return fn.apply(this, finalArgs);
+  }
+  return _currying;
 }
 // 无限参数
 function add() {
@@ -585,4 +627,482 @@ function myAdd() {
   }
   return add(...args);
 }
+// 防抖
+const debounce = (fn, param, delay) => {
+  if (fn.timerId) {
+    clearTimeout(fn.timerId);
+  }
+  fn.timerId = setTimeout(() => {
+    fn.call(this, param);
+  }, delay);
+}
+// function swap(array) {
+//   var target = array;
+//   var arr = [...target];
+//   var result = [];
+//   console.log(13)
+//   for(let i = 0; i < arr.length; i++) {
+//     const a = arr.splice(i,1);
+//     for (let j = 0; j <= arr.length; j++) {
+//       arr.splice(j,0,a[0])
+//       result.push(arr.join(''));
+//       arr.splice(j,1);
+//     }
+//     arr = [...target];
+//   }
+//   return result;
+// }
+// function getResult(str) {
+//   var targetArr = str.split('');
+//   var reverseStr = [...targetArr].reverse();
+//   var result = [...swap(targetArr), ...swap(reverseStr)];
+//   console.log(result);
+//   return [...new Set(result)];
+// }
+// function swap(arr,i,j) {  
+//   if(i != j) {
+//       var temp = arr[i];  
+//       arr[i] = arr[j];  
+//       arr[j] = temp;  
+//   }  
+// }
+// js 全排列
+function perm(str) {
+  var result = [];
+  if(str.length > 1) {
+    for (let i = 0; i < str.length; i ++) {
+      let current = str[i];
+      let rest = str.slice(0, i) + str.slice(i + 1);
+      let restEle = perm(rest);
+      // 把得到的结果进行拼装
+      for (let j = 0; j < restEle.length; j ++) {
+        result.push(`${current}${restEle[j]}`);
+      }
+    }
+    // 进行全排列
+  } if(str.length === 1) {
+    result.push(str);
+  }
+  return result;
+}
+class Node {
+  constructor(element){
+    this.element = element;
+    this.next = null;
+  }
 
+}
+// 链表(单向)
+class LinkedList {
+  constructor() {
+    this.head = new Node('head');
+  }
+  find(item) {
+    let current = this.head;
+    while(current.element !== item) {
+      current = current.next;
+    }
+    return current;
+  }
+  insert(item, target) {
+    const targetEle = this.find(target);
+    const newElement = new Node(item);
+    newElement.next = targetEle.next;
+    targetEle.next = newElement;
+  }
+  remove(item) {
+    const preTarget = this.findPrevious(item);
+    if (preTarget.next !== null) {
+      preTarget.next = preTarget.next.next;
+    }
+  }
+  findPrevious(item) {
+    let current = this.head;
+    while(current.next && current.next.element !== item) {
+      current = current.next;
+    }
+    return current;
+  }
+  display() {
+    let current = this.head;
+    while(current.next !== null) {
+      console.log(current.next.element);
+      current = current.next;
+    }
+  }
+  reverse() {
+    let current = this.head;
+    let n2 = current.next;
+    let n3 = null;
+    if (current === null || current.next === null) {
+      return current;
+    }
+    while(n2) {
+      n3 = n2.next; // 保存没引用的节点
+      n2.next = current; // 反转
+      current = n2; // 移动
+      n2 = n3;
+    }
+    this.head.next = null;
+    this.head = current;
+    return this.head;
+  }
+}
+class DNode {
+  constructor(element) {
+    this.element = element;
+    this.next = null;
+    this.previous = null;
+  }
+}
+// 双向链表
+class DLinkedList {
+  constructor() {
+    this.head = new DNode('head');
+    this.head.next = this.head; // 链表有环
+  }
+  find(item) {
+    let current = this.head;
+    while(current.element !== item) {
+      current = current.next;
+    }
+    return current;
+  }
+  insert(item,target) {
+    const targetEle = this.find(target);
+    const itemNode = new DNode(item);
+    itemNode.next = targetEle.next;
+    targetEle.next = itemNode;
+    itemNode.previous = targetEle;
+  }
+  remove(item) {
+    const itemTarget = this.find(item);
+    if (itemTarget.next) {
+      itemTarget.previous.next = itemTarget.next;
+      itemTarget.next.previous = itemTarget.previous;
+    } else {
+      itemTarget.previous.next = null;
+      itemTarget.previous = null;
+    }
+  }
+  displayAll() {
+    let current = this.head;
+    while(current.next !== null && current.next.element !== 'head') {
+      console.log(current.next.element);
+      current = current.next;
+    }
+  }
+  findLast() {
+    let current = this.head;
+    while(current.next !== null && current.next.element !== 'head'){
+      current = current.next;
+    }
+    return current;
+  }
+  displayReverse() {
+    let current = this.findLast();
+    while(current.previous !== null) {
+      console.log(current.element);
+      current = current.previous;
+    }
+  }
+  // 反转链表
+  reverse() {
+    let current = this.head;
+    while(current.next) {
+      let temp = current.next
+      current.next.next = current;
+      current = temp;
+    }
+  }
+}
+  // 判断链表是否有环
+  function isCycle(head) {
+    let a = head;
+    let b = head;
+    while(a.next && b.next && b.next.next){
+      if (a.next.element === b.next.next.element) {
+        return true;
+      }
+      a = a.next;
+      b = b.next.next;
+    }
+    return false
+  }
+  // 二叉树
+  class TreeNode{
+    constructor(data, left, right){
+      this.data = data;
+      this.left = left;
+      this.right = right;
+    }
+    show() {
+      return this.data;
+    }
+  }
+  class BST {
+    constructor() {
+      this.root = null;
+    }
+    insert(data) {
+      const node = new TreeNode(data, null, null);
+      if (this.root === null) {
+        this.root = node;
+      } else {
+        let current = this.root;
+        while(true) {
+          if (data < current.data) {
+            if (current.left === null) {
+              current.left = node;
+              break;
+            } else {
+              current = current.left;
+            }
+          }
+          if (data > current.data) {
+            if (current.right === null) {
+              current.right = node;
+              break;
+            } else {
+              current = current.right;
+            }
+          }
+        }
+      }
+    }
+    findMax() {
+      let current = this.root;
+      while(current.right !== null) {
+        current = current.right;
+      }
+      return current.data;
+    }
+    findMin() {
+      let current = this.root;
+      while(current.left !== null) {
+        current = current.left;
+      }
+      return current.data;
+    }
+  }
+   // 给定值输出路径
+   var showPathByTarget1 = (target, treeNode) => {
+    let path = [];
+    let result = [];
+    // console.log(path);
+    var _loops = (target, treeNode) => {
+      if (treeNode !== null) {
+        path.push(treeNode.data);
+        target -= treeNode.data;
+        if (target === 0 && (!treeNode.left || !treeNode.right)) {
+          result.push([...path]);
+        }
+        if (!treeNode.left) {
+          target += treeNode.data;
+        }
+        _loops(target, treeNode.left);
+        _loops(target, treeNode.right);
+        path.splice(path.length - 1);
+
+      }
+      return result;
+    }
+    return _loops(target, treeNode);
+  }
+  // 二叉树先序遍历
+  const firstLoop = (treeNode) => {
+    if(treeNode !== null) {
+      console.log(treeNode.data);
+      firstLoop(treeNode.left);
+      firstLoop(treeNode.right);
+    }
+  }
+  // 二叉树中序遍历
+  const midLoop = (treeNode) => {
+    if (treeNode !== null) {
+      midLoop(treeNode.left);
+      console.log(treeNode.data);
+      midLoop(treeNode.right);
+    }
+  }
+   // 二叉树后序遍历
+   const lastLoop = (treeNode) => {
+    if (treeNode !== null) {
+      lastLoop(treeNode.left);
+      lastLoop(treeNode.right);
+      console.log(treeNode.data);
+    }
+  }
+  
+  // 树的遍历（深度优先）
+  const deepFirst = (arr) => {
+    var _deepFirst = (arr) => {
+      for (let i = 0; i < arr.length; i ++) {
+        if (arr[i].children) {
+          _deepFirst(arr[i].children);
+        }
+        console.log(arr[i].name);
+      }
+    }
+    return _deepFirst(arr);
+  }
+  // 广度优先
+  const spreadFirst = (arr) => {
+    var _spreadFirst = (arr) => {
+      let queue = [...arr];
+      while(queue.length > 0) {
+        console.log(queue[0].name);
+        if (queue[0].children) {
+          queue.push(...queue[0].children);
+        }
+        queue = queue.slice(1);
+      }
+    }
+    return _spreadFirst(arr);
+  }
+  var tee = {
+    data: 5,
+    left: {
+      data: 4,
+      left: {
+        data: 11,
+        left: {
+          data: 7,
+          left: null,
+          right: null,
+        },
+        right: {
+          data: 2,
+          left: null,
+          right: null,
+        }
+      },
+      right: null,
+    },
+    right:{
+      data: 8,
+      left: {
+        data: 13,
+        left: null,
+        right: null,
+      },
+      right: {
+        data: 4,
+        left: {
+          data: 5,
+          left: null,
+          right: null,
+        },
+        right: {
+          data: 1,
+          left: null,
+          right: null,
+        }
+      }
+    }
+  }
+  class CreateStore {
+    constructor(reducer, initState) {
+      this.state = initState;
+      this.reducer = reducer;
+      this.listener = [];
+      this.dispatch({ type: null });
+    }
+    dispatch (action) {
+      this.state = this.reducer(this.state, action);
+      // 观察者
+      for(let i = 0; i < this.listener.length; i++) {
+        this.listener[i] && this.listener[i]();
+      }
+    }
+    getState () {
+      return this.state;
+    }
+    subscribe(listener) {
+      this.listener.push(listener);
+    }
+  }
+  function createStore(reducer, initState, enhancer) {
+    let currentState = initState;
+    let currentReducer = reducer;
+    let listener = [];
+    let isDispatching = false;
+    if (enhancer) {
+      return enhancer(createStore)(reducer, initState);
+    }
+    function dispatch(action) {
+      if (isDispatching) {
+        throw new Error("Reducers may not dispatch actions.");
+      }
+      try {
+        isDispatching = true;
+        currentState = currentReducer(currentState, action);
+      } finally {
+        isDispatching = false;
+      }
+      for(let i = 0; i < this.listener.length; i++) {
+        listener[i] && this.listener[i]();
+      }
+    }
+   var getState = function () {
+      return currentState;
+    }
+   var subscribe = function(listener) {
+      listener.push(listener);
+    }
+    dispatch({ type: 'INIT'});
+    return {
+      dispatch,
+      getState,
+      subscribe,
+    }
+  }
+  // combineReducer
+  function combineReducer(reducerObj) {
+    var finalState = {};
+    var reducer = function(state = {}, action) {
+      for(var key in reducerObj) {
+        finalState[key] = reducerObj[key](state[key], action);
+      }
+      return finalState;
+    }
+    return reducer;
+  }
+  function compose(...funs) {
+    return arg => funs.reduceRight((a, b) => b(a), arg);
+  }
+  function applyMiddleware(...middlewares) {
+    return (createStore) => (...args) => {
+      const store = createStore(...args);
+      let dispatch = () => {
+        throw new Error(
+          "Dispatching while constructing your middleware is not allowed. " +
+            "Other middleware would not be applied to this dispatch."
+        );
+      };
+      var middlewareAPI = {
+        getState: store.getState(),
+        dispatch: (...args) => dispatch(...args),
+      }
+      const chains = middlewares.map(middleWare => middleWare(middlewareAPI));
+      dispatch = compose(...chains)(store.dispatch);
+      return {
+        ...store,
+        dispatch,
+      }
+    }
+  }
+  var reducer1 = (state = 1, action) => {
+    return {
+      ...state
+    }
+  }
+  var reducer2 = (state = 2, action) => {
+    return {
+      ...state
+    }
+  }
+
+  var rfinal = combineReducer({r1: reducer1, r2: reducer2});
+  var store = new CreateStore(rfinal);
+  console.log(store.getState());

@@ -1,0 +1,22 @@
+{
+  "name": "jsfunction",
+  "version": "1.0.0",
+  "description": "",
+  "main": "jsFunction.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YE-Hao/js-Function.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/YE-Hao/js-Function/issues"
+  },
+  "homepage": "https://github.com/YE-Hao/js-Function#readme",
+  "dependencies": {
+    "redux-thunk": "^2.3.0"
+  }
+}
