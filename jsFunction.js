@@ -259,6 +259,20 @@ Array.prototype.Splice = function() {
     return arr;
   }
 }
+// 实现const
+var _const = function(data, value) {
+  window.data = value;
+  Object.defineProperty(window, data, {
+    enumerable: false,
+    configurable: false,
+    get(){
+      return value;
+    },
+    set(){
+      throw new TypeError('Assignment to constant variable');
+    }
+  })
+}
 let a = new Set([1, 2, 3]);
 let b = new Set([4, 3, 2]);
 
